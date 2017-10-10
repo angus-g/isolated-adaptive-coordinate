@@ -1,0 +1,6 @@
+*.so
+*.o
+*.mod
+build/
+.ipynb_checkpoints
+adaptive_wrap.c
