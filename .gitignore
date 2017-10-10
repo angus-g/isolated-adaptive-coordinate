@@ -3,4 +3,5 @@
 *.mod
 build/
 .ipynb_checkpoints
-adaptive_wrap.c
+adaptive/adaptive_wrap.c
+remapping/remapping_wrap.c
