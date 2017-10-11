@@ -8,6 +8,8 @@ module adaptive
   real, parameter :: H_subroundoff = 1e-20 * 1e-10
   real, parameter :: H_to_Pa = 9.8 * 1035.0
 
+  logical, parameter :: limiter = .false.
+
 contains
 
   subroutine build_grid_adaptive(h, t, s, dz, nx, ny, nz) bind(c)
@@ -65,7 +67,7 @@ contains
       enddo
     enddo
 
-    ! work on the rest of the interior interfaces
+    ! work on the rest of the interior interfaces (top-down)
     do K = 2, nz
       do j = 1, ny
         do i = 1, nx
@@ -111,7 +113,23 @@ contains
           di_sig(I,j) = 0.5 * (alpha_int(i,j) + alpha_int(i+1,j)) * (t_int(i+1,j) - t_int(i,j)) &
                + 0.5 * (beta_int(i,j) + beta_int(i+1,j)) * (s_int(i+1,j) - s_int(i,j))
 
-          ! apply limiter?
+          if (limiter) then
+            ! if di_sig is positive, the interface to the right is denser
+            ! (and the interface to the left is lighter)
+            ! this will cause the right interface to seek lighter water by moving
+            ! upwards, and vice versa on the left
+            if (di_sig(I,j) > 0.) then
+              ! limit downward motion to the left (thickness below left interface)
+              di_sig(I,j) = min(di_sig(I,j), h(i,j,k) * dk_sig(i,j,k))
+              ! limit upward motion to the right (thickness above right interface)
+              di_sig(I,j) = min(di_sig(I,j), h(i+1,j,k-1) * dk_sig(i+1,j,k-1))
+            else
+              ! limit upward motion to the left (thickness above left interface)
+              di_sig(I,j) = max(di_sig(I,j), -h(i,j,k-1) * dk_sig(i,j,k-1))
+              ! limit downward motion to the right (thickness below right interface)
+              di_sig(I,j) = max(di_sig(I,j), -h(i+1,j,k) * dk_sig(i+1,j,k))
+            endif
+          endif
         enddo
       enddo
 
@@ -120,6 +138,24 @@ contains
         do i = 1, nx
           dj_sig(i,J) = 0.5 * (alpha_int(i,j) + alpha_int(i,j+1)) * (t_int(i,j+1) - t_int(i,j)) &
                + 0.5 * (beta_int(i,j) + beta_int(i,j+1)) * (s_int(i,j+1) - s_int(i,j))
+
+          if (limiter) then
+            ! if dj_sig is positive, the interface to the north is denser
+            ! (and the interface to the south is lighter)
+            ! this will cause the north interface to seek lighter water by moving
+            ! upwards, and vice versa to the south
+            if (dj_sig(i,J) > 0.) then
+              ! limit downward motion to the south (thickness below south interface)
+              dj_sig(i,J) = min(dj_sig(i,J), h(i,j,k) * dk_sig(i,j,k))
+              ! limit upward motion to the north (thickness above north interface)
+              dj_sig(i,J) = min(dj_sig(i,J), h(i,j+1,k-1) * dk_sig(i,j+1,k-1))
+            else
+              ! limit upward motion to the south (thickness above south interface)
+              dj_sig(i,J) = max(dj_sig(i,J), -h(i,j,k-1) * dk_sig(i,j,k-1))
+              ! limit downward motion to the north (thickness below north interface)
+              dj_sig(i,J) = max(dj_sig(i,J), -h(i,j+1,k) * dk_sig(i,j+1,k))
+            endif
+          endif
         enddo
       enddo
 
